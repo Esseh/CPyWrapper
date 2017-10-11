@@ -1,6 +1,7 @@
 #include <iostream>
 #include <unordered_map>
 #include <Python.h>
+#include <vector>
 
 #define SmartPy(variableName,Object) PyPointer variableName=PyPointer(Object,"variableName")
 #define SmartPyFunc(resultName,functionObject,arguments) PyPointer resultName=PyPointer(PyObject_CallObject(functionObject,arguments),"resultName"); 
@@ -10,6 +11,7 @@ class PyPointer{
 		std::string name;
 		PyObject* physicalObject;
 	public:
+		PyObject* get(){return physicalObject;}
 		PyObject* operator()(){return physicalObject; }
 		PyPointer(PyObject* obj,std::string uniqueName){
 			static PyObject* main = PyImport_AddModule("__main__");
@@ -20,6 +22,23 @@ class PyPointer{
 		~PyPointer(){
 			Py_XDECREF(physicalObject);
 		};
+};
+
+class ReturnType{
+	public:
+		PyObject*error;
+		PyObject*result;
+		ReturnType(PyObject*e,PyObject*r){
+			error = e;
+			result= r;
+		}
+		~ReturnType(){
+			static PyObject* main = PyImport_AddModule("__main__");
+			PyObject_SetAttrString(main, "tok1", error);
+			PyObject_SetAttrString(main, "tok2", result);
+			Py_XDECREF(error);
+			Py_XDECREF(result);
+		}
 };
 
 class CPyWrapper{
@@ -38,20 +57,25 @@ class CPyWrapper{
 		}
 };
 
+ReturnType CallFunction(std::string moduleName, std::string functionName, PyPointer& args){
+	PyObject* wrapperFunction = CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction");
+	PyObject* innerFunction = CPyWrapper::GetFunction(moduleName,functionName);
+	SmartPy(nestedTuple,PyTuple_Pack(2,CPyWrapper::GetFunction("CPyWrapper.wrapper","tostring"),args()));
+	SmartPyFunc(functionResult,CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction"),nestedTuple());
+	return ReturnType(PyObject_GetAttrString(functionResult(),"error"),PyObject_GetAttrString(functionResult(),"result"));
+}
 
 int main(){
 	/// Initialize python interpreter
-    Py_Initialize();	
+    Py_Initialize();
 	
     std::string resultString;
     for(int i = 0; i < 1000000; i++){
 		SmartPy(one,PyString_FromString("1.1"));
 		SmartPy(two,PyString_FromString("2.1"));
-		SmartPy(tupleObj,PyTuple_Pack(2,one(),two()));
-		SmartPy(nestedTuple,PyTuple_Pack(2,CPyWrapper::GetFunction("CPyWrapper.wrapper","tostring"),tupleObj()));
-		SmartPyFunc(functionResult,CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction"),nestedTuple());
-		SmartPyAttr(resultObject,functionResult(),"result");
-		resultString = PyString_AsString(resultObject());
+		SmartPy(args,PyTuple_Pack(2,one(),two()));
+		ReturnType functionResult = CallFunction("CPyWrapper.wrapper","tostring",args);
+		resultString = PyString_AsString(functionResult.result);
     }
     std::cout << resultString << std::endl;
 	/// Close the python interpreter
