@@ -25,17 +25,20 @@ class PyPointer{
 };
 
 class ReturnType{
+	private:
+		std::string gcID;
 	public:
 		PyObject*error;
 		PyObject*result;
-		ReturnType(PyObject*e,PyObject*r){
+		ReturnType(PyObject*e,PyObject*r,std::string setgcID){
 			error = e;
 			result= r;
+			gcID = setgcID;
 		}
 		~ReturnType(){
 			static PyObject* main = PyImport_AddModule("__main__");
-			PyObject_SetAttrString(main, "tok1", error);
-			PyObject_SetAttrString(main, "tok2", result);
+			PyObject_SetAttrString(main, ("tok1"+gcID).c_str(), error);
+			PyObject_SetAttrString(main, ("tok2"+gcID).c_str(), result);
 			Py_XDECREF(error);
 			Py_XDECREF(result);
 		}
@@ -57,7 +60,7 @@ class CPyWrapper{
 		}
 };
 
-ReturnType CallFunction(std::string moduleName, std::string functionName, PyObject* args){
+ReturnType CallFunction(std::string moduleName, std::string functionName, PyObject* args, std::string gcID){
 	static PyObject* main = PyImport_AddModule("__main__");
 	static PyObject* wrapperFunction = CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction");
 	SmartPy(collectibleTuple,args);
@@ -68,7 +71,7 @@ ReturnType CallFunction(std::string moduleName, std::string functionName, PyObje
 		PyObject_SetAttrString(main, "temp", PyTuple_GetItem(args,i));
 		Py_XDECREF(PyTuple_GetItem(args,i));
 	}
-	return ReturnType(PyObject_GetAttrString(functionResult(),"error"),PyObject_GetAttrString(functionResult(),"result"));
+	return ReturnType(PyObject_GetAttrString(functionResult(),"error"),PyObject_GetAttrString(functionResult(),"result"),gcID);
 }
 
 int main(){
@@ -83,7 +86,8 @@ int main(){
 			PyTuple_Pack(2,
 				PyString_FromString("1.1"),
 				PyString_FromString("2.1")
-			)
+			),
+			"fR"
 		);
 		resultString = PyString_AsString(functionResult.result);
     }
