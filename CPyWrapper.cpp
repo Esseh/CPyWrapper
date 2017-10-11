@@ -57,11 +57,17 @@ class CPyWrapper{
 		}
 };
 
-ReturnType CallFunction(std::string moduleName, std::string functionName, PyPointer& args){
-	PyObject* wrapperFunction = CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction");
+ReturnType CallFunction(std::string moduleName, std::string functionName, PyObject* args){
+	static PyObject* main = PyImport_AddModule("__main__");
+	static PyObject* wrapperFunction = CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction");
+	SmartPy(collectibleTuple,args);
 	PyObject* innerFunction = CPyWrapper::GetFunction(moduleName,functionName);
-	SmartPy(nestedTuple,PyTuple_Pack(2,CPyWrapper::GetFunction("CPyWrapper.wrapper","tostring"),args()));
+	SmartPy(nestedTuple,PyTuple_Pack(2,CPyWrapper::GetFunction("CPyWrapper.wrapper","tostring"),args));
 	SmartPyFunc(functionResult,CPyWrapper::GetFunction("CPyWrapper.wrapper","executeFunction"),nestedTuple());
+	for(int i = 0; i < PyTuple_Size(args); i++){
+		PyObject_SetAttrString(main, "temp", PyTuple_GetItem(args,i));
+		Py_XDECREF(PyTuple_GetItem(args,i));
+	}
 	return ReturnType(PyObject_GetAttrString(functionResult(),"error"),PyObject_GetAttrString(functionResult(),"result"));
 }
 
@@ -71,10 +77,14 @@ int main(){
 	
     std::string resultString;
     for(int i = 0; i < 1000000; i++){
-		SmartPy(one,PyString_FromString("1.1"));
-		SmartPy(two,PyString_FromString("2.1"));
-		SmartPy(args,PyTuple_Pack(2,one(),two()));
-		ReturnType functionResult = CallFunction("CPyWrapper.wrapper","tostring",args);
+		ReturnType functionResult = CallFunction(
+			"CPyWrapper.wrapper",
+			"tostring",
+			PyTuple_Pack(2,
+				PyString_FromString("1.1"),
+				PyString_FromString("2.1")
+			)
+		);
 		resultString = PyString_AsString(functionResult.result);
     }
     std::cout << resultString << std::endl;
