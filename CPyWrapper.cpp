@@ -65,7 +65,7 @@ CPyWrapper::ReturnType CPyWrapper::Func(std::string moduleName, std::string func
     /// Create our argument tuple for our wrapper function.
     PyPointer wrapperArgs = PyPointer(
         PyTuple_Pack(2,
-            CPyWrapper::GetFunction("CPyWrapper.wrapper","tostring"),
+            CPyWrapper::GetFunction(moduleName,functionName),
             args
         ),
         "wrapperArgs"
